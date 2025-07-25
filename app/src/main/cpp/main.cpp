@@ -14,7 +14,7 @@ int main(void)
     init(ga, gs);
 
     while (!WindowShouldClose()) {
-        updateAndDraw(ga, gs);
+        updateAndDraw(gs);
     }
 
     CloseWindow();        // Close window and OpenGL context

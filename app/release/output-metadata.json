@@ -4,7 +4,7 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.raylib.hexgame",
+  "applicationId": "com.raylib.hehex",
   "variantName": "release",
   "elements": [
     {

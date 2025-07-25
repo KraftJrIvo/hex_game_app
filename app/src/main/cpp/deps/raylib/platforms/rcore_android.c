@@ -952,7 +952,6 @@ static void AndroidCommandCallback(struct android_app *app, int32_t cmd)
         {
             //rendering = true;
         } break;
-        case APP_CMD_RESUME: break;
         case APP_CMD_INIT_WINDOW:
         {
             if (app->window != NULL)
@@ -1045,13 +1044,14 @@ static void AndroidCommandCallback(struct android_app *app, int32_t cmd)
                 }
             }
         } break;
+        case APP_CMD_RESUME:
         case APP_CMD_GAINED_FOCUS:
         {
             platform.appEnabled = true;
             CORE.Window.flags &= ~FLAG_WINDOW_UNFOCUSED;
             //ResumeMusicStream();
         } break;
-        case APP_CMD_PAUSE: break;
+        case APP_CMD_PAUSE:
         case APP_CMD_LOST_FOCUS:
         {
             platform.appEnabled = false;
