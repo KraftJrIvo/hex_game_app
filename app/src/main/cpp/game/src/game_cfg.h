@@ -3,12 +3,19 @@
 
 #include "raylib.h"
 
+#define WIN_NOM "h e h e x"
+
 #define WINDOW_WIDTH   432
 #define WINDOW_HEIGHT  864
+#define MAX_WIDTH 512.f
 #define BOARD_WIDTH    9
 #define BOARD_HEIGHT   36
 #define TILE_SIZE      16.0f
-#define TILE_RADIUS    std::min(GetScreenWidth(), GetScreenHeight()) / (BOARD_WIDTH * 2.0f)
+#ifdef PLATFORM_ANDROID
+    #define TILE_RADIUS    std::min(GetScreenWidth(), GetScreenHeight()) / (BOARD_WIDTH * 2.0f)
+#else
+    #define TILE_RADIUS    std::min(std::min(GetScreenWidth(), GetScreenHeight()) / (BOARD_WIDTH * 2.0f), MAX_WIDTH / (BOARD_WIDTH * 2.0f))
+#endif
 #define TILE_PIXEL     (TILE_RADIUS * 2.0f) / TILE_SIZE
 #define MAX_PARTICLES  1024
 #define MAX_TODROP     1024

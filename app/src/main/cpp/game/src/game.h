@@ -136,7 +136,7 @@ struct GameState {
         DO_NOT_SERIALIZE
         int bestScore = 0;
         int n_params = 2;
-        bool musEnabled = true;
+        bool musEnabled = false;
         bool sndEnabled = true;
         bool accEnabled = true;
         bool velEnabled = true;
@@ -155,6 +155,7 @@ struct GameState {
         float shTime;
         float shFadeTime = WAVE_FADE_TIME;
         Vector2 shScreenSize;
+        float shBWidth;
         std::array<float, 128> shDropTimes;
         std::array<Vector2, 128> shDropCenters;
         Vector2 shMaskTilePos;

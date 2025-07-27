@@ -172,9 +172,10 @@ void addAnimation(GameState& gs, const Texture2D* tex, float interval, Vector2 p
 }
 
 void addScorePoints(GameState& gs, Vector2 pos, Color col, int n) {
+    auto brec = getBoardRect(gs);
     for (int i = 0; i < n; ++i) {
-        Vector2 endPos = {TILE_RADIUS * 2.0f + (GetScreenWidth() - TILE_RADIUS * 6.0f) * 0.25f, GetScreenHeight() - TILE_RADIUS};
-        Vector2 cpPos = {GetScreenWidth() * 0.5f + RAND_FLOAT_SIGNED * GetScreenWidth() * 0.33f, 0.5f * (endPos.y + pos.y) };
+        Vector2 endPos = {TILE_RADIUS * 2.0f + brec.x - TILE_RADIUS * 0.5f + (brec.width - TILE_RADIUS * 6.0f) * 0.25f, GetScreenHeight() - TILE_RADIUS};
+        Vector2 cpPos = {brec.x + brec.width * 0.5f + RAND_FLOAT_SIGNED * brec.width * 0.33f, 0.5f * (endPos.y + pos.y) };
         gs.tmp.scorePoints.acquire(ScorePoint{pos + TILE_RADIUS * RAND_FLOAT_SIGNED_2D, cpPos, endPos, getTime(gs), SCORE_FLY_TIME + RAND_FLOAT * SCORE_FLY_SPREAD, col});
     }
     gs.score += n;
@@ -282,9 +283,9 @@ void loadAssets(GameAssets& ga, GameState& gs) {
 
 #ifdef PLATFORM_ANDROID
     auto postProcFragShaderStr = prepShader((unsigned char*)res_post_proc_fs);
-    ga.postProcFragShader = LoadShaderFromMemory(NULL, (const char*)postProcFragShaderStr.c_str());
-    auto maskFragShaderStr = prepShader((unsigned char*)res_mask_fs);
-    ga.maskFragShader = LoadShaderFromMemory(NULL, (const char*)maskFragShaderStr.c_str());
+        ga.postProcFragShader = LoadShaderFromMemory(NULL, (const char*)postProcFragShaderStr.c_str());
+        auto maskFragShaderStr = prepShader((unsigned char*)res_mask_fs);
+        ga.maskFragShader = LoadShaderFromMemory(NULL, (const char*)maskFragShaderStr.c_str());
 #else
     ga.postProcFragShader = LoadShaderFromMemory(NULL, (const char*)res_post_proc_fs);
     ga.maskFragShader = LoadShaderFromMemory(NULL, (const char*)res_mask_fs);
@@ -356,7 +357,8 @@ void shootAndRearm(GameState& gs) {
     float dir = gs.gun.dir + PI * 0.5f;
     gs.bullet.thing = gs.gun.armed;
     gs.bullet.vel = BULLET_SPEED * Vector2{cos(dir), -sin(dir)};
-    gs.bullet.pos = {(float)GetScreenWidth() * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
+    auto brec = getBoardRect(gs);
+    gs.bullet.pos = {(float)brec.x + brec.width * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
     playSound(gs, gs.ga.p->whoosh[0]);
     rearm(gs);
 }
@@ -732,14 +734,17 @@ void checkAnimations(GameState& gs) {
 }
 
 void gameOver(GameState& gs) {
+    if (gs.gameOver)
+        return;
     gs.gameOver = true;
     gs.gameOverTime = getTime(gs);
     gs.bullet.exists = false;
-    Vector2 gunPos = {(float)GetScreenWidth() * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
+    auto brec = getBoardRect(gs);
+    Vector2 gunPos = {brec.x + brec.width * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
     addParticle(gs, gs.gun.armed, gunPos, Vector2{50.0f * RAND_FLOAT_SIGNED, -400.0f - 100.0f * RAND_FLOAT});
-    addParticle(gs, gs.gun.next, {GetScreenWidth() - TILE_RADIUS, GetScreenHeight() - TILE_RADIUS}, Vector2{50.0f * RAND_FLOAT_SIGNED, -400.0f - 100.0f * RAND_FLOAT});
+    addParticle(gs, gs.gun.next, {brec.x + brec.width - TILE_RADIUS, GetScreenHeight() - TILE_RADIUS}, Vector2{50.0f * RAND_FLOAT_SIGNED, -400.0f - 100.0f * RAND_FLOAT});
     if (gs.gun.extraArmed)
-        addParticle(gs, gs.gun.extra, {TILE_RADIUS, GetScreenHeight() - TILE_RADIUS}, Vector2{50.0f * RAND_FLOAT_SIGNED, -400.0f - 100.0f * RAND_FLOAT});
+        addParticle(gs, gs.gun.extra, {brec.x + TILE_RADIUS, GetScreenHeight() - TILE_RADIUS}, Vector2{50.0f * RAND_FLOAT_SIGNED, -400.0f - 100.0f * RAND_FLOAT});
     if (!gs.alteredDifficulty && gs.score > gs.usr.bestScore) {
         gs.usr.bestScore = gs.score;
         saveUserData(gs);
@@ -752,13 +757,13 @@ void update(GameState& gs)
 {
     if (gs.gameStartTime + GAME_START_TIME < getTime(gs)) {
         auto delta = getFrameTime(gs) / UPDATE_ITS;
-
+        auto brec = getBoardRect(gs);
 #ifdef PLATFORM_ANDROID
         if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
 #else
-            if (fabs(GetMouseDelta().x) > 0) {
+        if (fabs(GetMouseDelta().x) > 0) {
 #endif
-            Vector2 gunPos = {(float)GetScreenWidth() * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
+            Vector2 gunPos = {(float)brec.x + brec.width * 0.5f, (float)GetScreenHeight() - TILE_RADIUS};
             gs.gun.dir = atan2(gunPos.y - GetMouseY(), GetMouseX() - gunPos.x) - PI * 0.5f;
         } else if (IsKeyDown(KEY_LEFT)) {
             gs.gun.dir += gs.gun.speed * delta;
@@ -798,7 +803,7 @@ void updateOnce(GameState& gs)
 #ifdef PLATFORM_ANDROID
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
 #else
-                if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)))
+            if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)))
 #endif
                 reset(gs);
 
@@ -835,7 +840,7 @@ void updateOnce(GameState& gs)
 #ifdef PLATFORM_ANDROID
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && !gs.bullet.exists)
 #else
-                if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) && !gs.bullet.exists)
+            if ((IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) && !gs.bullet.exists)
 #endif
                 shootAndRearm(gs);
         }
@@ -844,7 +849,7 @@ void updateOnce(GameState& gs)
 #ifdef PLATFORM_ANDROID
         if ((GetTouchPointCount() == 2 && touchCount == 1) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && GetMouseY() > GetScreenHeight() - TILE_RADIUS * 2.0f))
 #else
-            if (IsKeyPressed(KEY_LEFT_CONTROL) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && GetMouseY() > GetScreenHeight() - TILE_RADIUS * 2.0f))
+        if (IsKeyPressed(KEY_LEFT_CONTROL) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) || (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && GetMouseY() > GetScreenHeight() - TILE_RADIUS * 2.0f))
 #endif
             swapExtra(gs);
         touchCount = GetTouchPointCount();
@@ -995,7 +1000,8 @@ void drawBullet(const GameState& gs) {
 
 void drawGameOver(const GameState& gs) {
     float coeff = easeOutBounce(1.0f - std::clamp((gs.gameOverTime + GAME_OVER_TIMEOUT - getTime(gs))/GAME_OVER_TIMEOUT_BEF, 0.0, 1.0));
-    Vector2 skulpos = {GetScreenWidth() * 0.5f, GetScreenHeight() * -0.25f + coeff * GetScreenHeight() * 0.5f};
+    auto brec = getBoardRect(gs);
+    Vector2 skulpos = {brec.x + brec.width * 0.5f, GetScreenHeight() * -0.25f + coeff * GetScreenHeight() * 0.5f};
     drawTile(gs, {2, ((int(floor(getTime(gs) * 10)) % 2 == 0) ? 5 : (gs.alteredDifficulty ? 9 : ((gs.score == 0) ? 8 : ((gs.usr.bestScore == gs.score) ? 7 : 6))))}, skulpos);
     auto verdictstr = (gs.usr.bestScore == gs.score && !gs.alteredDifficulty) ? ((gs.usr.bestScore > 0) ? std::string("NEW RECORD!") : std::string("Really now???")) : ("Best: " + std::to_string(gs.usr.bestScore));
     auto sz = getTextSize(gs);
@@ -1004,33 +1010,35 @@ void drawGameOver(const GameState& gs) {
 
     auto scorestr = gs.alteredDifficulty ? ("\"" + std::to_string(gs.score) + "\"") : std::to_string(gs.score);
     auto meas = MeasureTextEx(gs.ga.p->font, scorestr.c_str(), sz, 1.0);
-    auto txtPos1prv = Vector2{TILE_RADIUS * 2.0f + (GetScreenWidth() - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f};
+    auto txtPos1prv = Vector2{TILE_RADIUS * 2.0f + brec.x - TILE_RADIUS * 0.5f + (brec.width - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f};
     auto scorestr2 = "x" + std::to_string(gs.combo);
-    auto txtPosnew = Vector2{GetScreenWidth() * 0.5f - meas.x * 0.5f, GetScreenHeight() * 0.5f - meas.y * 0.5f};
+    auto txtPosnew = Vector2{brec.x + brec.width * 0.5f - meas.x * 0.5f, GetScreenHeight() * 0.5f - meas.y * 0.5f};
     meas = MeasureTextEx(gs.ga.p->font, scorestr2.c_str(), getTextSize(gs), 1.0);
-    auto txtPos2prv = Vector2{GetScreenWidth() - TILE_RADIUS * 2.0f - (GetScreenWidth() - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f};
+    auto txtPos2prv = Vector2{brec.x + brec.width - TILE_RADIUS * 1.5f - (brec.width - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f};
 
     drawText(gs, scorestr, txtPos1prv + (txtPosnew - txtPos1prv) * coeff, PINK);
     //drawText(scorestr, txtPos2prv + (txtPosnew - txtPos2prv) * coeff, PINK);
     drawText(gs, scorestr2, txtPos2prv + Vector2{0, TILE_RADIUS} * 2.0f * coeff, COMBO_COLORS[gs.combo - 1]);
-    drawTile(gs, {2, 4}, {GetScreenWidth() * 0.5f, GetScreenHeight() * 1.25f - coeff * GetScreenHeight() * 0.5f}, WHITE, {TILE_SIZE, TILE_SIZE + 1});
+    drawTile(gs, {2, 4}, {brec.x + brec.width * 0.5f, GetScreenHeight() * 1.25f - coeff * GetScreenHeight() * 0.5f}, WHITE, {TILE_SIZE, TILE_SIZE + 1});
 }
 
 void drawBottom(const GameState& gs)
 {
     float startCoeff = easeOutQuad(std::clamp((getTime(gs) - gs.gameStartTime)/GAME_START_TIME, 0.0, 1.0));
 
-    Vector2 nextNextPos = {GetScreenWidth() - TILE_RADIUS + TILE_RADIUS  * 2.0f, GetScreenHeight() - TILE_RADIUS};
-    Vector2 nextPos = {GetScreenWidth() + TILE_RADIUS - startCoeff * 2 * TILE_RADIUS, GetScreenHeight() - TILE_RADIUS};
-    Vector2 gunPos = {(float)GetScreenWidth() * 0.5f, (float)GetScreenHeight() + TILE_RADIUS - startCoeff * 2 * TILE_RADIUS};
-    Vector2 extraPos = {-2.0f * TILE_RADIUS + startCoeff * 3.0f * TILE_RADIUS, GetScreenHeight() - TILE_RADIUS};
+    auto brec = getBoardRect(gs);
+
+    Vector2 nextNextPos = {brec.x + brec.width - TILE_RADIUS + TILE_RADIUS  * 2.0f, GetScreenHeight() - TILE_RADIUS};
+    Vector2 nextPos = {brec.x + brec.width + TILE_RADIUS - startCoeff * 2 * TILE_RADIUS, GetScreenHeight() + TILE_RADIUS - startCoeff * TILE_RADIUS * 2.0f};
+    Vector2 gunPos = {(float)brec.x + brec.width * 0.5f, (float)GetScreenHeight() + TILE_RADIUS - startCoeff * 2 * TILE_RADIUS};
+    Vector2 extraPos = {brec.x - 2.0f * TILE_RADIUS + startCoeff * 3.0f * TILE_RADIUS, GetScreenHeight() + TILE_RADIUS - startCoeff * TILE_RADIUS * 2.0f};
     float rearmCoeff = easeOutQuad(std::clamp((getTime(gs) - gs.rearmTime)/REARM_TIMEOUT, 0.0, 1.0));
     float swapCoeff = easeOutQuad(std::clamp((getTime(gs) - gs.swapTime)/REARM_TIMEOUT, 0.0, 1.0));
     if (startCoeff < 1.0f) rearmCoeff = 1.0f;
 
     float gameOverCoeff = gs.gameOver ? easeOutQuad(std::clamp((getTime(gs) - gs.gameOverTime)/GAME_OVER_TIMEOUT, 0.0, 1.0)) : 0.0f;
-    DrawCircleV(gunPos + gameOverCoeff * Vector2{0, TILE_RADIUS * 3.0f}, TILE_RADIUS + TILE_RADIUS * 0.2f, COMBO_COLORS[gs.combo - 1]);
-    DrawCircleV(extraPos + gameOverCoeff * Vector2{-TILE_RADIUS * 3.0f, 0}, TILE_RADIUS + TILE_RADIUS * 0.2f, DARKGRAY);
+    DrawCircleLinesV(gunPos + gameOverCoeff * Vector2{0, TILE_RADIUS * 3.0f}, TILE_RADIUS * 2.f, WHITE);
+    DrawCircleLinesV(extraPos + Vector2{0, -TILE_PIXEL} + gameOverCoeff * Vector2{-TILE_RADIUS * 3.0f, TILE_RADIUS * 2.5f}, TILE_RADIUS + TILE_RADIUS * 0.2f, DARKGRAY);
 
     if (!gs.gameOver) {
 
@@ -1054,10 +1062,10 @@ void drawBottom(const GameState& gs)
             drawThing(gs, gunPos + (extraPos - gunPos) * swapCoeff, gs.gun.extra);
         auto scorestr = gs.alteredDifficulty ? ("\"" + std::to_string(gs.tmp.visScore) + "\"") : std::to_string(gs.tmp.visScore);
         auto meas = MeasureTextEx(gs.ga.p->font, scorestr.c_str(), getTextSize(gs), 1.0);
-        drawText(gs, scorestr, {TILE_RADIUS * 2.0f + (GetScreenWidth() - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f - (1.0f - startCoeff) * TILE_RADIUS * 2.0f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f}, PINK);
+        drawText(gs, scorestr, {TILE_RADIUS * 2.0f + brec.x - TILE_RADIUS * 0.5f + (brec.width - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f - (1.0f - startCoeff) * TILE_RADIUS * 2.0f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f}, PINK);
         auto scorestr2 = "x" + std::to_string(gs.combo);
         meas = MeasureTextEx(gs.ga.p->font, scorestr2.c_str(), getTextSize(gs), 1.0);
-        drawText(gs, scorestr2, {GetScreenWidth() - TILE_RADIUS * 2.0f - (GetScreenWidth() - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f}, COMBO_COLORS[gs.combo - 1]);
+        drawText(gs, scorestr2, {brec.x + brec.width - TILE_RADIUS * 1.5f - (brec.width - TILE_RADIUS * 6.0f) * 0.25f - meas.x * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f, GetScreenHeight() - TILE_RADIUS - meas.y * 0.5f + (1.0f - startCoeff) * TILE_RADIUS * 2.0f}, COMBO_COLORS[gs.combo - 1]);
 
         bool warning = false;
 
@@ -1118,8 +1126,10 @@ void updateAndDrawSettings(GameState& gs)
 
     updateMusic(gs);
 
-    auto sndPos = Vector2{(float)int(GetScreenWidth() * 0.333f), (float)int(GetScreenHeight() * 0.25f)};
-    auto musPos = Vector2{(float)int(GetScreenWidth() * 0.666f), (float)int(GetScreenHeight() * 0.25f)};
+    auto brec = getBoardRect(gs);
+
+    auto sndPos = Vector2{(float)int(brec.x + brec.width * 0.333f), (float)int(GetScreenHeight() * 0.25f)};
+    auto musPos = Vector2{(float)int(brec.x + brec.width * 0.666f), (float)int(GetScreenHeight() * 0.25f)};
     drawTile(gs, {3, 2}, sndPos);
     if (!gs.usr.sndEnabled)
         drawTile(gs, {3, 3}, sndPos);
@@ -1131,7 +1141,7 @@ void updateAndDrawSettings(GameState& gs)
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && Vector2DistanceSqr(musPos, GetMousePosition()) < TILE_RADIUS * TILE_RADIUS)
         gs.usr.musEnabled = !gs.usr.musEnabled;
 
-    auto movPos = Vector2{(float)int(GetScreenWidth() * 0.333f) - TILE_RADIUS * 2.0f, (float)int(GetScreenHeight() * 0.25f + TILE_RADIUS * 4.0f)};
+    auto movPos = Vector2{(float)int(brec.x + brec.width * 0.333f) - TILE_RADIUS * 2.0f, (float)int(GetScreenHeight() * 0.25f + TILE_RADIUS * 4.0f)};
     drawTile(gs, {3, (gs.usr.velEnabled ? 1 : 0)}, movPos);
     drawText(gs, "board movement", movPos + Vector2{TILE_RADIUS * 1.5f, -TILE_RADIUS + TILE_PIXEL * 2.0f}, WHITE);
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && abs(movPos.y - GetMousePosition().y) < TILE_RADIUS) {
@@ -1164,6 +1174,14 @@ DLL_EXPORT void updateAndDraw(GameState& gs)
 
     if (!gs.usr.velEnabled || !gs.usr.accEnabled || (gs.usr.n_params == 1))
         gs.alteredDifficulty = true;
+    else if (!gs.firstShotFired) {
+        gs.alteredDifficulty = false;
+    }
+
+    if (IsWindowResized()) {
+        auto rt = RenderTexture{};
+        setStuff(gs.ga.p, rt, gs);
+    }
 
     BeginTextureMode(gs.tmp.renderTex);
     ClearBackground(BLACK);
@@ -1197,8 +1215,10 @@ DLL_EXPORT void updateAndDraw(GameState& gs)
 
     gs.tmp.shTime = getTime(gs);
     gs.tmp.shScreenSize = {(float)GetScreenWidth(), (float)GetScreenHeight()};
+    gs.tmp.shBWidth = getBoardRect(gs).width;
     SetShaderValue(gs.ga.p->postProcFragShader, GetShaderLocation(gs.ga.p->postProcFragShader, "time"), &gs.tmp.shTime, SHADER_UNIFORM_FLOAT);
     SetShaderValue(gs.ga.p->postProcFragShader, GetShaderLocation(gs.ga.p->postProcFragShader, "screenSize"), &gs.tmp.shScreenSize, SHADER_UNIFORM_VEC2);
+    SetShaderValue(gs.ga.p->postProcFragShader, GetShaderLocation(gs.ga.p->postProcFragShader, "bWidth"), &gs.tmp.shBWidth, SHADER_UNIFORM_FLOAT);
     SetShaderValue(gs.ga.p->postProcFragShader, GetShaderLocation(gs.ga.p->postProcFragShader, "nDrops"), &gs.tmp.shNDrops, SHADER_UNIFORM_INT);
     if (gs.tmp.shNDrops) {
         SetShaderValueV(gs.ga.p->postProcFragShader, GetShaderLocation(gs.ga.p->postProcFragShader, "dropTimes"), gs.tmp.shDropTimes.data(), SHADER_UNIFORM_FLOAT, gs.tmp.shNDrops);
